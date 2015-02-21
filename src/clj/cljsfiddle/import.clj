@@ -21,9 +21,15 @@
   (let [uri (or uri
                 (env :datomic-uri)
                 "datomic:free://localhost:4334/cljsfiddle")]
+    (prn "creating db")
     (d/create-database uri)
+    (prn "ok")
     (let [conn (d/connect uri)]
-       @(d/transact conn schema))))
+      (prn "creating schema")
+      @(d/transact conn schema)
+      (prn "ok")
+      (System/exit 0)
+      )))
 
 ;; Import js and cljs from the classpath into datomic.
 
@@ -74,8 +80,11 @@
 ;; TODO: Figure out if schema is installed.
 (defn -main [uri]
   (let [conn (d/connect uri)
-        files (find-files #{"cljs/" "clojure/" "goog/" "domina" "hiccups" 
-                            "dommy" "om" "quiescent" "reagent"}
+        files (find-files #{"cljs/" "clojure/" "goog/" "domina" "hiccups"
+                            "cljsjs"
+                            "react" "om"  "quiescent" "reagent"
+                            "rum" "sablono" "datascript"
+                            "dommy"}
                           (filter #(.endsWith % ".jar")
                                   (-> "java.class.path"
                                       System/getProperty
@@ -86,12 +95,13 @@
         cljs-objects (map cljs-object-from-file cljs-files)]
     (println "transacting cljs")
     (doseq [cljs cljs-objects]
+      (pr "Considering " (:file cljs) "... ")
+      (flush)
       (let [cljs-tx (:tx (src/cljs-tx (d/db conn) cljs))]
-        (print "Considering " (:file cljs) "... ")
         (if-not (empty? cljs-tx)
           (do @(d/transact conn cljs-tx)
-              (println "transacted."))
-          (println "skipped.")
+              (prn "transacted."))
+          (prn "skipped.")
           )))
     (println "done.")
     (println "transacting js")
@@ -116,7 +126,8 @@
 
     (println "Running storage GC")
     (d/gc-storage conn (Date.))
-    (println "Done.")))
+    (println "Done."))
+  (System/exit 0))
 
 ;; (-main (env :datomic-uri))
 

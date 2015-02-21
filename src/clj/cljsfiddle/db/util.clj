@@ -3,10 +3,13 @@
             [clojure.java.io :as io]
             [clojure.tools.reader :as reader]
             [datomic.api :as d]
+            [cljs.analyzer :as ana]
             [cljs.env :as cljs-env]
             [cljs.closure :as closure]
             [cljs.js-deps :as cljs-deps]
+            [cljsfiddle.compiler :refer [compiler-env]]
             [cljs.tagged-literals :as tags]
+            [taoensso.timbre :as log]
             [environ.core :refer (env)])
   (:import [clojure.lang LineNumberingPushbackReader]
            [java.io StringReader BufferedReader]
@@ -37,14 +40,38 @@
       line-seq
       cljs-deps/parse-js-ns))
 
+(comment
+  (defn log-time [prev txt]
+  (let [cur (System/nanoTime)
+        diff (- cur prev)
+        ms (-> diff
+               (/ 1000000) int)]
+    (log/trace (format "%dms | %s" ms txt))
+    cur)))
+
 (defn cljs-object-from-src [cljs-src-str]
-  (let [cljs-src (read-all cljs-src-str)
-        js-src (cljs-env/with-compiler-env
-                 (cljs-env/default-compiler-env)
-                 (closure/-compile cljs-src {})) ;; TODO perf.
+  (let [parsed-ns (ana/parse-ns
+                   (-> cljs-src-str
+                       StringReader.
+                       BufferedReader.))
+        cljs-src (binding [*ns* (-> parsed-ns :ns)]
+                   (read-all cljs-src-str))
+        
+        [deps-src js-src]
+        (cljs-env/with-compiler-env compiler-env
+          (let [opts {}
+
+                compiled (closure/-compile cljs-src opts)
+                js-sources (closure/add-dependencies opts compiled)
+                fdeps-str  (closure/foreign-deps-str
+                            opts
+                            (filter closure/foreign-source? js-sources))]
+
+            [fdeps-str compiled]))
         {:keys [provides requires]} (parse-js-ns js-src)]
     {:src cljs-src-str
      :js-src js-src
+     :deps-src deps-src
      :sha (sha cljs-src-str)
      :ns (first provides)
      :requires (set requires)}))

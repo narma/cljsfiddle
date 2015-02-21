@@ -1,7 +1,7 @@
 (ns cljsfiddle.views
   (:require [hiccup.util :refer (escape-html)]
             [environ.core :refer (env)]
-            [cljsfiddle.closure :refer [compile-cljs*]]))
+            [cljsfiddle.db.util :refer [cljs-object-from-src]]))
 
 (def google-analytics-script
   "(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
@@ -113,6 +113,11 @@
            [:a {:href "http://cljsfiddle.net"} "cljsfiddle.net"] " &copy; 2013 Jonas Enlund"]]]))
 
 (defn html-view [ns fiddle deps]
+  (let [cljs-obj (-> fiddle
+                       :cljsfiddle/cljs
+                       :cljsfiddle.src/blob
+                       :cljsfiddle.blob/text
+                       cljs-object-from-src)]
   [:html
    [:head
     [:title ns]
@@ -128,14 +133,10 @@
         :cljsfiddle.blob/text)
     [:script "CLOSURE_NO_DEPS=true;"]
     [:script "COMPILED=true;"]
+    [:script (:deps-src cljs-obj)]
     (for [dep deps]
       [:script {:src (str "/jscache/" (env :cljsfiddle-version) "/" dep)}])
-    [:script
-     (-> fiddle
-          :cljsfiddle/cljs
-          :cljsfiddle.src/blob
-          :cljsfiddle.blob/text
-          compile-cljs*)]]])
+    [:script (:js-src cljs-obj)]]]))
 
 (defn about-view [user]
   (base (navbar user)

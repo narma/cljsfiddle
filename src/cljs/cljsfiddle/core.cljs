@@ -1,4 +1,5 @@
 (ns cljsfiddle.core
+  (:require-macros [hiccups.core :as hiccups])
   (:require [clojure.string :as s]
             [cljs.reader :as reader]
             [domina :as dom]
@@ -21,14 +22,15 @@
              [:script {:src (str "/jscache/" version "/" (s/replace dep ".cljs" ".js"))}])]
     (apply str (map render-html (concat html ds)))))
 
-(defn make-srcdoc [html css js deps version]
-  (render-html
+(defn make-srcdoc [html css js deps-src deps version]
+  (hiccups/html
    [:html
     [:head
      [:style css]]
     [:body
      [:script "window.onerror = function(msg, url, line) { parent.postMessage('{:type :runtime-error}', '*'); return false;};"]
      html
+     [:script (or deps-src "")]
      (make-deps deps version)
      [:script "cljs.core.set_print_fn_BANG_.call(null,function(s){var s = s.replace(/\"/g, \"&quot;\"); parent.postMessage('{:type :runtime-print :to-print \"' + s + '\"}', '*');});"]
      [:script js]
@@ -99,7 +101,7 @@
                                    ">" "&gt;"})])
 
 (defn output-html [msg]
-  (render-html (output-hiccup msg)))
+  (hiccups/html (output-hiccup msg)))
 
 (defn output-fn []
   (let [out (dom/by-id "output")]
@@ -156,6 +158,7 @@
                       (dom/add-class! run-btn "disabled")
                       (http/POST "/compiler/compile"
                         {:params {:src (.getValue cljs-editor)}
+                         :format :edn
                          :handler (fn [res]
                                     (dom/remove-class! run-btn "disabled")
                                     (condp = (:status res)
@@ -163,6 +166,7 @@
                                       (let [srcdoc (make-srcdoc (.getValue html-editor)
                                                                 (.getValue css-editor)
                                                                 (:js-src res)
+                                                                (:deps-src res)
                                                                 (:dependencies res)
                                                                 version)]
                                         (.setAttribute result-frame "srcdoc" srcdoc))
@@ -174,6 +178,7 @@
                         {:params {:cljs (.getValue cljs-editor)
                                   :html (.getValue html-editor)
                                   :css (.getValue css-editor)}
+                         :format :edn
                          :handler (fn [res]
                                     (dom/remove-class! save-btn "disabled")
                                     (if (= (:status res) :success)

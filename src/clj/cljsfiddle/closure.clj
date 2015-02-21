@@ -8,6 +8,7 @@
             [cljsfiddle.db.src :as src]
             [cljs.closure :as cljs]
             [cljs.env :as cljs-env]
+            [cljsfiddle.compiler :refer [compiler-env]]
             [taoensso.timbre :as log]
             [clojure.pprint :refer [pprint]]
             [datomic.api :as d]
@@ -17,7 +18,7 @@
            [java.util.logging Level]
            [java.io StringReader BufferedReader]
            [com.google.javascript.jscomp.Compiler]
-           [com.google.javascript.jscomp JSSourceFile
+           [com.google.javascript.jscomp SourceFile
                                          CompilerOptions
                                          CompilationLevel
                                          ClosureCodingConvention]))
@@ -31,11 +32,7 @@
    :body (pr-str edn-data)})
 
 (defn compile-cljs* [cljs-src-str]
-  (let [cljs-src (read-all cljs-src-str)
-        js-src (cljs-env/with-compiler-env
-                 (cljs-env/default-compiler-env)
-                 (cljs/-compile cljs-src {}))]
-    js-src))
+  (:js-src (cljsfiddle.db.util/cljs-object-from-src cljs-src-str)))
 
 (defn js-errors [error]
   {:description (.description error)
@@ -53,8 +50,8 @@
                               (.setOptionsForCompilationLevel level compiler-options)
                               compiler-options)
              compiler (com.google.javascript.jscomp.Compiler.)
-             src (JSSourceFile/fromCode name src)
-             externs (JSSourceFile/fromCode "externs" "")
+             src (SourceFile/fromCode name src)
+             externs (SourceFile/fromCode "externs" "")
              result (.compile compiler externs src options)]
          (if (.success result)
            (merge {:status :success
@@ -81,7 +78,11 @@
              tdb (:db-after (d/with db (:tx cljs-tx)))
              deps (db/dependency-files tdb (:ns cljs-obj))
              js-src-obj (closure-compile (:js-src cljs-obj))
-             js-src-obj (assoc js-src-obj :dependencies deps :status :ok)]
+             js-src-obj (assoc js-src-obj
+                          :dependencies deps
+                          :deps-src (:deps-src cljs-obj)
+                          :status :ok)]
+
          (edn-response js-src-obj))
        (catch clojure.lang.ExceptionInfo e
          (edn-response
