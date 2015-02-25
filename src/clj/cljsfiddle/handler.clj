@@ -9,16 +9,15 @@
             [cljsfiddle.db :as db]
             [cljsfiddle.db.util :as util]
             [datomic.api :as d]
-            [ring.adapter.jetty :as jetty]
+            [aleph.http :as http]
+            [byte-streams :as bs]
             [ring.util.response :as res]
             [ring.middleware.session.cookie :as cookie]
-            [ring.middleware.stacktrace :refer (wrap-stacktrace)]
-            [ring.middleware.edn :refer (wrap-edn-params)]
+            [ring.middleware.format :refer [wrap-restful-format]]
             [compojure.core :refer :all]
-            [compojure.handler :as handler]
+            [ring.middleware.defaults :refer :all]
             [compojure.route :as route]
             [environ.core :refer (env)]
-            [clj-http.client :as http]
             [cheshire.core :as json]
             [hiccup.page :refer [html5]]
             [taoensso.timbre :as log]))
@@ -29,11 +28,6 @@
 (assert (env :github-client-id) "GITHUB_CLIENT_ID environment variable not set")
 (assert (env :github-client-secret) "GITHUB_CLIENT_SECRET environment variable not set")
 
-(defn ensure-jscache-dir []
-  (let [p (str "resources/jscache/" (:cljsfiddle-version env) "/")
-        f (java.io.File. p)]
-    (when (.mkdirs f)
-      (println "Created" p))))
 
 (defn edn-response [edn-data]
   {:status 200
@@ -42,21 +36,36 @@
 
 ;; From technomancy/syme
 (defn get-token [code]
-  (-> (http/post "https://github.com/login/oauth/access_token"
+  (try
+    (-> @(http/post "https://github.com/login/oauth/access_token"
                  {:form-params {:client_id (env :github-client-id)
                                 :client_secret (env :github-client-secret)
                                 :code code}
-                  :headers {"Accept" "application/json"}})
-      (:body)
+                  :headers {"User-Agent" "aleph"}
+                  :accept :json})
+      :body
+      bs/to-string
       (json/decode true)
-      :access_token))
+      :access_token)
+  (catch Exception e
+    (log/info (-> (ex-data e)
+                  :body bs/to-string))
+    (throw e))))
 
 (defn get-username [token]
-  (-> (http/get (str "https://api.github.com/user?access_token=" token)
-                {:headers {"accept" "application/json"}})
-      (:body)
-      (json/decode true)
-      :login))
+  (try
+    (-> @(http/get "https://api.github.com/user"
+                  {:query-params {:access_token token}
+                   :headers {"User-Agent" "aleph"}
+                   :accept :json})
+        :body
+        bs/to-string
+        (json/decode true)
+        :login)
+  (catch Exception e
+    (log/info (-> (ex-data e)
+                  :body bs/to-string))
+    (throw e))))
 
 (defn parse-ns-form [src]
   (try
@@ -177,6 +186,7 @@
            :session (merge session {:token token
                                     :username username})))))
 
+
    (GET "/logout"
      []
      (assoc (res/redirect "/") :session nil))
@@ -191,18 +201,13 @@
   (let [store (cookie/cookie-store {:key (env :session-secret)})
         db-uri (env :datomic-uri)
         conn (d/connect db-uri)]
-    (-> (handler/site (app-routes conn)
-                      {:session {:store store}})
-        wrap-edn-params)))
-
-(def app (get-handler))
-
-(defn -main []
-  (ensure-jscache-dir)
-  (let [port (Integer/parseInt (or (env "PORT") "8080"))]
-    (jetty/run-jetty (-> app
-                         wrap-stacktrace)
-                     {:port port :join? false})))
+    (-> (app-routes conn)
+        (wrap-restful-format :formats [:transit-json :edn])
+        (wrap-defaults
+         (-> site-defaults
+             (assoc-in [:session :store] store)
+             (assoc-in [:security :anti-forgery] false))) ; temp
+        )))
 
 ;; (.stop server)
 ;; (def server (-main))

@@ -1,25 +1,25 @@
 (defproject cljsfiddle "0.1.0-SNAPSHOT"
   :description "CLJSFiddle"
   :url "http://cljsfiddle.net"
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-2850"]
-                 [org.clojure/tools.reader "0.8.4"]
-                 [org.clojure/core.match "0.2.1"]
+  :dependencies [[org.clojure/clojure "1.7.0-alpha5"]
+                 [org.clojure/clojurescript "0.0-2913"]
+                 [org.clojure/tools.reader "0.8.15"]
+                 [org.clojure/core.match "0.2.2"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                 [org.clojure/core.logic "0.8.7"]
+                 [org.clojure/core.logic "0.8.9"]
                  [org.clojure/tools.macro "0.1.5"]
                  [com.datomic/datomic-free "0.9.5130"]
-                 [ring/ring-jetty-adapter "1.3.0"]
-                 [ring/ring-devel "1.3.0"]
-                 [fogus/ring-edn "0.2.0"]
-                 [commons-codec "1.9"]
-                 [me.raynes/fs "1.4.5"]
-                 [compojure "1.1.8"]
-                 [clj-http "0.9.2"]
-                 [cheshire "5.3.1"]
+                 [javax.servlet/servlet-api "2.5"]
+                 [ring/ring-devel "1.3.2"]
+                 [ring/ring-defaults "0.1.4"]
+                 [aleph "0.4.0-beta3"]
+                 [commons-codec "1.10"]
+                 [me.raynes/fs "1.4.6"]
+                 [compojure "1.3.2"]
+                 [cheshire "5.4.0"]
                  [hiccup "1.0.5"]
-                 [environ "0.5.0"]
-                 [com.taoensso/timbre "3.2.1"]
+                 [environ "1.0.0"]
+                 [com.taoensso/timbre "3.4.0"]
                  [hylla "0.2.0"]
                  [domina "1.0.3"]
                  [prismatic/dommy "1.0.0"]
@@ -27,21 +27,18 @@
                  [reagent "0.5.0-alpha3"]
                  [quiescent "0.1.4"]
                  [hiccups "0.3.0"]
-                 [cljs-ajax "0.3.10"]
+                 [cljs-http "0.1.26"]
+                 [ring-middleware-format "0.4.0"]
                  [rum "0.2.5"]
                  [datascript "0.9.0"]
 ]
   :source-paths ["src/clj" "src/cljs"]
-  :plugins [[lein-ring "0.8.10"]
-            [lein-cljsbuild "1.0.4"]]
-;  :main cljsfiddle.handler
+  :plugins [[lein-cljsbuild "1.0.5"]]
+  :aot [cljsfiddle.main]
+  :main cljsfiddle.main
 ;  :uberjar-name "cljsfiddle-standalone.jar"
   :min-lein-version "2.0.0"
   :profiles {:dev {:dependencies [[ring-mock "0.1.5"]]}}
-  :ring {:handler cljsfiddle.handler/app
-         :port 8080
-         :stacktraces? true
-         :auto-reload? true}
   :cljsbuild {:builds {:dev {
                         :source-paths ["src/cljs"]
                         :compiler {:output-to "resources/public/js/app.js"

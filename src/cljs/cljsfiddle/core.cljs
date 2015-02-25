@@ -1,13 +1,18 @@
 (ns cljsfiddle.core
-  (:require-macros [hiccups.core :as hiccups])
-  (:require [clojure.string :as s]
+  (:require-macros [hiccups.core :as hiccups]
+                   [cljs.core.async.macros :refer [go]])
+  (:require [cljs-http.client :as http]
+            [cljs.core.async :refer [<!]]
+            [clojure.string :as s]
             [cljs.reader :as reader]
             [domina :as dom]
             [domina.css :as css]
             [domina.events :as events]
             [hylla.remote :as remote]
-            [ajax.core :as http]
+
             [hiccups.runtime :refer (render-html)]))
+
+(enable-console-print!)
 
 (defn ends-with? [string suffix]
   (not= -1 (.indexOf string suffix (- (.-length string) (.-length suffix)))))
@@ -156,36 +161,37 @@
     (events/listen! run-btn :click
                     (fn [e]
                       (dom/add-class! run-btn "disabled")
-                      (http/POST "/compiler/compile"
-                        {:params {:src (.getValue cljs-editor)}
-                         :format :edn
-                         :handler (fn [res]
-                                    (dom/remove-class! run-btn "disabled")
-                                    (condp = (:status res)
-                                      :ok
-                                      (let [srcdoc (make-srcdoc (.getValue html-editor)
-                                                                (.getValue css-editor)
-                                                                (:js-src res)
-                                                                (:deps-src res)
-                                                                (:dependencies res)
-                                                                version)]
-                                        (.setAttribute result-frame "srcdoc" srcdoc))
-                                      :exception (output res)))})))
+                      (go (let [response
+                                (<! (http/post "/compiler/compile"
+                                               {:edn-params {:src (.getValue cljs-editor)}}))
+                                res (:body response)]
+                            (dom/remove-class! run-btn "disabled")
+                            (condp = (:status res)
+                              :ok
+                              (let [srcdoc (make-srcdoc (.getValue html-editor)
+                                                        (.getValue css-editor)
+                                                        (:js-src res)
+                                                        (:deps-src res)
+                                                        (:dependencies res)
+                                                        version)]
+                                (.setAttribute result-frame "srcdoc" srcdoc))
+                              :exception (output res))))))
+
     (events/listen! save-btn :click
                     (fn [e]
                       (dom/add-class! save-btn "disabled")
-                      (http/POST "/save"
-                        {:params {:cljs (.getValue cljs-editor)
-                                  :html (.getValue html-editor)
-                                  :css (.getValue css-editor)}
-                         :format :edn
-                         :handler (fn [res]
-                                    (dom/remove-class! save-btn "disabled")
-                                    (if (= (:status res) :success)
-                                      (do (reset! saved? true)
-                                          (toggle-saved!)
-                                          (output (assoc res :msg "Fiddle saved successfully!")))
-                                      (output res)))})))
+                      (go (let [response
+                                (<! (http/post "/save"
+                                               {:edn-params {:cljs (.getValue cljs-editor)
+                                                         :html (.getValue html-editor)
+                                                         :css (.getValue css-editor)}}))
+                                res (:body response)]
+                            (dom/remove-class! save-btn "disabled")
+                            (if (= (:status res) :success)
+                              (do (reset! saved? true)
+                                (toggle-saved!)
+                                (output (assoc res :msg "Fiddle saved successfully!")))
+                              (output res))))))
 
     (.on (js/$ "a[data-toggle=\"tab\"]")
          "shown.bs.tab"

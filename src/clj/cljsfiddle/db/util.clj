@@ -56,7 +56,7 @@
                        BufferedReader.))
         cljs-src (binding [*ns* (-> parsed-ns :ns)]
                    (read-all cljs-src-str))
-        
+
         [deps-src js-src]
         (cljs-env/with-compiler-env compiler-env
           (let [opts {}

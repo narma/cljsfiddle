@@ -12,6 +12,8 @@
   ga('create', 'UA-9233187-2', 'cljsfiddle.net');
   ga('send', 'pageview');")
 
+(def google-analytics-script "") ;; tmp: delete me
+
 (defn base [nav & content]
   [:html {:lang "en"}
    [:head
@@ -30,11 +32,7 @@
     [:div.full-width-container content]
     [:script {:src "//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"}]
     [:script {:src "//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"}]
-    [:script {:src "/js/codemirror.js"}]
-    [:script {:src "/js/mode/clojure/clojure.js"}]
-    [:script {:src "/js/mode/css/css.js"}]
-    [:script {:src "/js/addon/edit/matchbrackets.js"}]
-    [:script {:src "/js/addon/edit/closebrackets.js"}]
+    [:script {:src "/js/codemirror-compressed.js"}]
     [:script {:src "/js/app.js"}]
     [:script "cljsfiddle.core.init('" (env :cljsfiddle-version) "');"]]])
 
