@@ -23,7 +23,8 @@
         handler (if (:reload env)
                   (-> (var app)
                       (wrap-reload
-                       {:dirs (map str (cp/classpath-directories))}))
+                       {:dirs (map str (cp/classpath-directories))})
+                      wrap-stacktrace)
                   app)]
     (http/start-server handler {:port port})
     (println "Server ready at port " port)))

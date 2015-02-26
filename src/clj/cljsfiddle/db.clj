@@ -2,13 +2,14 @@
   (:require [cljsfiddle.db.fiddle :as fiddle]
             [cljsfiddle.db.util :as util]
             [datomic.api :as d]
+            [taoensso.timbre :as log]
             [environ.core :refer (env)]))
 
 (defn requires [db ns]
   (map first
        (d/q '[:find ?requires
               :in $ ?ns
-              :where 
+              :where
               [?e :cljsfiddle.src/ns ?ns]
               [?e :cljsfiddle.src/requires ?requires]]
             db ns)))
@@ -27,7 +28,7 @@
     (toposort* node dag sorted (atom #{}) (atom #{}))
     @sorted))
 
-(defn dependencies 
+(defn dependencies
   "Returns the dependencies of ns in dependency order"
   [db ns]
   (butlast (toposort ns db)))
@@ -41,7 +42,7 @@
                  [?b :cljsfiddle.blob/sha ?sha]]
                db ns)))
 
-(defn dependency-files 
+(defn dependency-files
   [db ns]
   (let [files (distinct
                (for [ns (dependencies db ns)]
@@ -50,7 +51,7 @@
         base (-> (d/entity db :goog/base)
                  :cljsfiddle.src/blob
                  :cljsfiddle.blob/sha)]
-    (cons (str base ".js") 
+    (cons (str base ".js")
           files)))
 
 (defn save-fiddle [conn fiddle]
@@ -83,7 +84,7 @@
                 [?tx :db/txInstant ?inst]]]
     (d/q query db user [:cljsfiddle/cljs :cljsfiddle/html :cljsfiddle/css])))
 
-(comment 
+(comment
   (def db (-> :datomic-uri
               env
               d/connect
@@ -94,8 +95,8 @@
   (dependencies db "cljs.core")
 
   (:cljsfiddle.src/ns (:cljsfiddle/cljs (find-fiddle-by-ns db "foo.bar")))
-  
-  
+
+
   (util/fiddle "(ns foo.bar) (defn add [x y] (+ x y))"
                "<html></html>"
                "body {}"))

@@ -7,12 +7,14 @@
             [cljsfiddle.db.util :refer [cljs-object-from-src read-all]]
             [cljsfiddle.db.src :as src]
             [cljs.closure :as cljs]
+            [cljs.js-deps :as cljs-deps]
+            [cljsfiddle.compiler :as cl]
             [cljs.env :as cljs-env]
-            [cljsfiddle.compiler :refer [compiler-env]]
             [taoensso.timbre :as log]
             [clojure.pprint :refer [pprint]]
             [datomic.api :as d]
             [compojure.core :refer :all]
+            [cljsfiddle.import :refer (import-libs)]
             [environ.core :refer (env)])
   (:import [clojure.lang LineNumberingPushbackReader]
            [java.util.logging Level]
@@ -32,7 +34,7 @@
    :body (pr-str edn-data)})
 
 (defn compile-cljs* [cljs-src-str]
-  (:js-src (cljsfiddle.db.util/cljs-object-from-src cljs-src-str)))
+  (:js-src (cljs-object-from-src cljs-src-str)))
 
 (defn js-errors [error]
   {:description (.description error)
@@ -67,13 +69,36 @@
 
 (def closure-compile (make-compiler {:optimizations :whitespace}))
 
+(defn find-files [paths jars]
+  (filter (fn [file]
+            (and ;(some #(.contains file %) paths)
+                 (some #(.endsWith file %) [".js" ".cljs"])))
+          (mapcat cljs-deps/jar-entry-names* jars)))
+
+(defn transact-deps
+  [conn classloader deps]
+  ;; todo, skip already transacted deps
+  (let [deps-uniq (apply hash-set (map #(-> % first str) deps))
+        jar-files (for [f (map #(.getFile %) (vec (.getURLs classloader)))
+                        :when (some #(.contains f %) deps-uniq)]
+                    f)
+        files (find-files deps-uniq jar-files)]
+    (import-libs conn files {:classloader classloader
+                             :compile? true
+                             :closure-compile closure-compile})))
+
 (defn compile-routes [conn]
   (routes
    (POST "/compile"
-     {{cljs-src-str :src} :params}
+     {{cljs-src-str :src lib-deps :deps} :params}
      (try
-       (let [db (d/db conn)
-             cljs-obj (cljs-object-from-src cljs-src-str)
+       (let [deps-list (read-all lib-deps)
+             default-cl (cl/current-classloader)
+             compiler-cl (cl/make-classloader deps-list)
+             _ (cl/set-current-classloader compiler-cl)
+             _ (transact-deps conn compiler-cl deps-list)
+             db (d/db conn)
+             cljs-obj (cljs-object-from-src cljs-src-str {:classloader compiler-cl})
              cljs-tx (src/cljs-tx db cljs-obj)
              tdb (:db-after (d/with db (:tx cljs-tx)))
              deps (db/dependency-files tdb (:ns cljs-obj))
@@ -82,17 +107,18 @@
                           :dependencies deps
                           :deps-src (:deps-src cljs-obj)
                           :status :ok)]
-
+         (cl/set-current-classloader default-cl)
          (edn-response js-src-obj))
-       (catch clojure.lang.ExceptionInfo e
-         (edn-response
-          {:status :exception
-           :msg (.getMessage e)}))
-       (catch Exception e
-         (log/error (.getMessage e))
-         (edn-response
-          {:status :exception
-           :msg "Something went terribly wrong."}))))))
+;;        (catch clojure.lang.ExceptionInfo e
+;;          (edn-response
+;;           {:status :exception
+;;            :msg (.getMessage e)}))
+;;        (catch Exception e
+;;          (log/error (.getMessage e))
+;;          (edn-response
+;;           {:status :exception
+;;            :msg "Something went terribly wrong."}))
+       ))))
 
 ;(compile-cljs* " \n\n(defn adsd [x y] (+ x y))")
 

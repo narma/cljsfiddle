@@ -7,7 +7,7 @@
             [cljs.env :as cljs-env]
             [cljs.closure :as closure]
             [cljs.js-deps :as cljs-deps]
-            [cljsfiddle.compiler :refer [compiler-env]]
+            [cljsfiddle.compiler :as cl]
             [cljs.tagged-literals :as tags]
             [taoensso.timbre :as log]
             [environ.core :refer (env)])
@@ -49,18 +49,20 @@
     (log/trace (format "%dms | %s" ms txt))
     cur)))
 
-(defn cljs-object-from-src [cljs-src-str]
+(defn cljs-object-from-src
+  [cljs-src-str & [{:keys [classloader]
+                    :or {classloader (cl/current-classloader)}
+                    :as opts}]]
   (let [parsed-ns (ana/parse-ns
                    (-> cljs-src-str
                        StringReader.
                        BufferedReader.))
         cljs-src (binding [*ns* (-> parsed-ns :ns)]
                    (read-all cljs-src-str))
-
+        compiler-env (cl/get-compiler-env classloader) ;; todo memoize?
         [deps-src js-src]
         (cljs-env/with-compiler-env compiler-env
           (let [opts {}
-
                 compiled (closure/-compile cljs-src opts)
                 js-sources (closure/add-dependencies opts compiled)
                 fdeps-str  (closure/foreign-deps-str
@@ -76,9 +78,10 @@
      :ns (first provides)
      :requires (set requires)}))
 
-(defn cljs-object-from-file [cljs-file]
+(defn cljs-object-from-file
+  [cljs-file & args]
   (let [cljs-src-str (slurp (io/resource cljs-file))
-        cljs-object (cljs-object-from-src cljs-src-str)]
+        cljs-object (apply cljs-object-from-src (concat [cljs-src-str] args))]
     (assoc cljs-object
       :file cljs-file)))
 

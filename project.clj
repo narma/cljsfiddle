@@ -8,6 +8,8 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.clojure/core.logic "0.8.9"]
                  [org.clojure/tools.macro "0.1.5"]
+                 [com.cemerick/pomegranate "0.3.0"]
+                 [org.tcrawley/dynapath "0.2.3"]
                  [com.datomic/datomic-free "0.9.5130"]
                  [javax.servlet/servlet-api "2.5"]
                  [ring/ring-devel "1.3.2"]
@@ -39,6 +41,7 @@
 ;  :uberjar-name "cljsfiddle-standalone.jar"
   :min-lein-version "2.0.0"
   :profiles {:dev {:dependencies [[ring-mock "0.1.5"]]}}
+  :jvm-opts ["-XX:+UseG1GC"]
   :cljsbuild {:builds {:dev {
                         :source-paths ["src/cljs"]
                         :compiler {:output-to "resources/public/js/app.js"

@@ -167,7 +167,8 @@
                       (dom/add-class! run-btn "disabled")
                       (go (let [response
                                 (<! (http/post "/compiler/compile"
-                                               {:edn-params {:src (.getValue cljs-editor)}}))
+                                               {:edn-params {:src (.getValue cljs-editor)
+                                                             :deps (.getValue deps-editor)}}))
                                 res (:body response)]
                             (dom/remove-class! run-btn "disabled")
                             (condp = (:status res)

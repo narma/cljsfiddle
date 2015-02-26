@@ -78,6 +78,33 @@
 
 ;; Import cljs and js deps. Idempotent
 ;; TODO: Figure out if schema is installed.
+(defn import-libs
+  [conn files & [{:keys [classloader compile? closure-compile]
+                    :or {classloader (-> (Thread/currentThread)
+                                          (.getContextClassLoader))}
+                    :as opts}]]
+  (let [js-files (filter #(.endsWith % ".js") files)
+        js-objects (map js-object-from-file js-files)
+        cljs-files (filter #(.endsWith % ".cljs") files)
+        cljs-objects (map #(cljs-object-from-file % {:classloader classloader})
+                          cljs-files)]
+    ;(println "transacting cljs")
+    (doseq [cljs cljs-objects]
+      (when compile?
+            (spit (str "resources/jscache/" (env :cljsfiddle-version)
+                       "/" (:sha cljs) ".js")
+                  (:js-src (closure-compile (:js-src cljs))))
+          )
+      (let [cljs-tx (:tx (src/cljs-tx (d/db conn) cljs))]
+        (when-not (empty? cljs-tx)
+          @(d/transact conn cljs-tx)
+          )))
+    (doseq [js js-objects]
+      (let [js-tx (src/js-tx (d/db conn) js)]
+        (when-not (empty? js-tx)
+          @(d/transact conn js-tx))))))
+
+
 (defn -main [uri]
   (let [conn (d/connect uri)
         files (find-files #{"cljs/" "clojure/" "goog/" "domina" "hiccups"
@@ -88,31 +115,12 @@
                           (filter #(.endsWith % ".jar")
                                   (-> "java.class.path"
                                       System/getProperty
-                                      (s/split #":"))))
-        js-files (filter #(.endsWith % ".js") files)
-        js-objects (map js-object-from-file js-files)
-        cljs-files (filter #(.endsWith % ".cljs") files)
-        cljs-objects (map cljs-object-from-file cljs-files)]
-    (println "transacting cljs")
-    (doseq [cljs cljs-objects]
-      (pr "Considering " (:file cljs) "... ")
-      (flush)
-      (let [cljs-tx (:tx (src/cljs-tx (d/db conn) cljs))]
-        (if-not (empty? cljs-tx)
-          (do @(d/transact conn cljs-tx)
-              (prn "transacted."))
-          (prn "skipped.")
-          )))
+                                      (s/split #":"))))]
+
+    (println "Import predefined libs")
+    (import-libs conn files)
     (println "done.")
-    (println "transacting js")
-    (doseq [js js-objects]
-      (let [js-tx (src/js-tx (d/db conn) js)]
-        (print "Considering " (:file js) "... ")
-        (if-not (empty? js-tx)
-          (do @(d/transact conn js-tx)
-              (println "transacted."))
-          (println "skipped."))))
-    (println "done.")
+
     (println "Special casing goog/base.js")
     (let [tx (goog-base-tx (d/db conn))]
       (when-not (empty? tx)
@@ -123,11 +131,9 @@
       (when-not (empty? tx)
         (println tx)
         @(d/transact conn tx)))
-
     (println "Running storage GC")
     (d/gc-storage conn (Date.))
-    (println "Done."))
-  (System/exit 0))
+    (System/exit 0)))
 
 ;; (-main (env :datomic-uri))
 
