@@ -62,6 +62,7 @@
          [:div#tab-container.col-lg-6
 
           [:ul#editor-tabs.nav.nav-tabs
+           [:li [:a {:href "#deps-editor-tab" :data-toggle "tab"} "deps"]]
            [:li.active [:a {:href "#cljs-editor-tab" :data-toggle "tab"} "cljs"]]
            [:li [:a {:href "#html-editor-tab" :data-toggle "tab"} "html"]]
            [:li [:a {:href "#css-editor-tab" :data-toggle "tab"} "css"]]
@@ -74,6 +75,11 @@
              [:span.glyphicon.glyphicon-floppy-save]]]]
 
           [:div.tab-content
+           [:div#deps-editor-tab.tab-pane
+            [:textarea#deps-editor.tab-pane (escape-html (-> fiddle
+                                                                    :cljsfiddle/deps
+                                                                    :cljsfiddle.src/blob
+                                                                    :cljsfiddle.blob/text))]]
            [:div#cljs-editor-tab.tab-pane.active
             [:textarea#cljs-editor.tab-pane.active (escape-html (-> fiddle
                                                                     :cljsfiddle/cljs

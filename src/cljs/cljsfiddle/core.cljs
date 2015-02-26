@@ -122,6 +122,10 @@
 
   (let [html-editor (code-mirror "html-editor" {:lineNumbers true})
         css-editor (code-mirror "css-editor" {:mode :css :lineNumbers true})
+        deps-editor (code-mirror "deps-editor" {:mode :clojure
+                                                :lineNumbers true
+                                                :autoCloseBrackets true
+                                                :matchBrackets true})
         cljs-editor (code-mirror "cljs-editor" {:mode :clojure
                                                 :lineNumbers true
                                                 :autoCloseBrackets true
@@ -134,7 +138,7 @@
         tab-container (domina/by-id "tab-container")
         output (output-fn)
         set-editor-heights (fn [height]
-                             (doseq [editor [cljs-editor html-editor css-editor]]
+                             (doseq [editor [deps-editor cljs-editor html-editor css-editor]]
                                (.setSize editor "100%" (str height "px"))))]
 
     (set-editor-heights 400)
@@ -197,11 +201,12 @@
          "shown.bs.tab"
          (fn [evt]
            (condp = (dom/attr (.-target evt) :href)
+             "#deps-editor-tab" (.refresh deps-editor)
              "#cljs-editor-tab" (.refresh cljs-editor)
              "#html-editor-tab" (.refresh html-editor)
              "#css-editor-tab" (.refresh css-editor))))
 
-    (register-change-listeners cljs-editor html-editor css-editor)
+    (register-change-listeners deps-editor cljs-editor html-editor css-editor)
 
     (.addEventListener js/window "message"
                        (fn [evt]

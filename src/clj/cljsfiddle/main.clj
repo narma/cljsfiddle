@@ -4,6 +4,7 @@
            [ring.middleware.reload :refer (wrap-reload)]
            [environ.core :refer (env)]
            [aleph.http :as http]
+           [clojure.java.classpath :as cp]
            [ring.adapter.jetty :refer (run-jetty)]
            )
   (:gen-class))
@@ -21,7 +22,8 @@
   (let [port (Integer/parseInt (or (env "PORT") "8080"))
         handler (if (:reload env)
                   (-> (var app)
-                      wrap-reload)
+                      (wrap-reload
+                       {:dirs (map str (cp/classpath-directories))}))
                   app)]
     (http/start-server handler {:port port})
     (println "Server ready at port " port)))
